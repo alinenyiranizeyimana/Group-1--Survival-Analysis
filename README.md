@@ -4,7 +4,7 @@
 
 **Parametric Survival Analysis of the Veterans’ Administration Lung Cancer Dataset**
 
-## 📖 Overview
+## Overview
 
 This project applies survival analysis techniques to study time-to-event data from the Veterans’ Administration lung cancer dataset. The goal is to understand patient survival patterns, compare parametric models, and identify the best model for describing survival behavior.
 
@@ -68,7 +68,7 @@ The results show that survival varies widely among patients, with many early dea
 * Extend analysis to other medical datasets
 * Investigate treatment effects in more detail
 
-## 👥 Team Members
+## Team Members
 
 * Aline
 * Anicet
@@ -76,12 +76,12 @@ The results show that survival varies widely among patients, with many early dea
 * Sidoine
 * Sandra
 
-## 🛠️ Tools Used
+##  Tools Used
 
 * R (survival, flexsurv, survminer)
 * LaTeX (Beamer)
 
-## 📌 Conclusion
+##  Conclusion
 
 This project demonstrates the importance of flexible parametric models in survival analysis. The generalized gamma model best captures the complex survival patterns observed in lung cancer patients.
 
