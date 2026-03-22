@@ -686,7 +686,209 @@ save_kable(gengamma_summary, "genvariance.png", zoom=4)
 
 
 
+### Plot 2 × 2 Life Functions
 
+
+
+
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+t <- seq(0.001, max(df_veteran$time), length.out = 200)
+x_range <- range(t, na.rm = TRUE)
+
+common_theme <- theme_bw() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 12),
+    axis.title = element_text(size = 10, face = "bold", color = "black"),
+    axis.text.x = element_text(size = 10, color = "black"),
+    axis.text.y = element_text(size = 10, color = "black")
+  )
+
+p1 <- ggplot(data.frame(t, S), aes(x = t, y = S)) +
+  geom_line(color = "darkgreen", linewidth = 1) +
+  labs(title = "Survival Function", x = "Time", y = "S(t)") +
+  coord_cartesian(xlim = x_range) +
+  common_theme
+
+p2 <- ggplot(data.frame(t, h), aes(x = t, y = h)) +
+  geom_line(color = "lightblue", linewidth = 1) +
+  labs(title = "Hazard Function", x = "Time", y = "h(t)") +
+  coord_cartesian(xlim = x_range) +
+  common_theme
+
+p3 <- ggplot(data.frame(t, f), aes(x = t, y = f)) +
+  geom_line(color = "violet", linewidth = 1) +
+  labs(title = "Density Function", x = "Time", y = "f(t)") +
+  coord_cartesian(xlim = x_range) +
+  common_theme
+
+p4 <- ggplot(data.frame(t, F), aes(x = t, y = F)) +
+  geom_line(color = "brown", linewidth = 1) +
+  labs(title = "CDF", x = "Time", y = "F(t)") +
+  coord_cartesian(xlim = x_range) +
+  common_theme
+
+life_plot <- arrangeGrob(
+  p1, p2, p3, p4,
+  ncol = 2,
+  top = ""
+)
+
+grid.arrange(life_plot)
+
+ggsave(
+  filename = "life_functions_best_model.png"
+)
+```
+
+
+
+
+```{r}
+library(survival)
+library(flexsurv)
+
+#******** Kaplan-Meier by treatment group
+km_trt <- survfit(Surv(time, status) ~ trt, data = df_veteran)
+
+#******** Generalized gamma by treatment group
+gengamma_trt <- flexsurvreg(Surv(time, status) ~ trt, data = df_veteran, dist = "gengamma")
+
+t_grid <- seq(0, max(df_veteran$time), length.out = 300)
+
+s_std  <- summary(gengamma_trt,
+                  newdata = data.frame(trt = "Standard"),
+                  t = t_grid,
+                  type = "survival")
+
+s_test <- summary(gengamma_trt,
+                  newdata = data.frame(trt = "Test"),
+                  t = t_grid,
+                  type = "survival")
+
+plot(km_trt,
+     col = c("blue", "brown"),
+     lty = c(1, 1),
+     lwd = 2,
+     mark.time = TRUE,
+     xlab = "Time (days)",
+     ylab = "Survival probability",
+     main = "Kaplan-Meier and Generalized Gamma Curves by Treatment",
+     xlim = c(0, max(df_veteran$time)),
+     ylim = c(0, 1))
+
+lines(t_grid, s_std[[1]]$est,
+      col = "black", lwd = 2, lty =1)
+
+lines(t_grid, s_test[[1]]$est,
+      col = "darkgreen", lwd = 2, lty = 1)
+
+legend("topright",
+       legend = c("KM Standard", "KM Test",
+                  "GenGamma Standard", "GenGamma Test"),
+       col = c("blue", "brown", "black", "darkgreen"),
+       lty = c(1, 1, 1, 1),
+       lwd = 2,
+       bty = "n")
+
+ggsave(
+  filename = "model_by_group.png"
+)
+```
+
+
+
+
+
+
+### Model Diagnostic
+
+
+
+
+
+
+
+```{r}
+time_seq <- seq(0, max(df_veteran$time), length.out = 200)
+
+S_t <- summary(best_fit, t = time_seq, type = "survival")[[1]]$est
+
+#******* Cox-Snell residuals from best model
+
+cumhaz_out <- summary(best_fit, t = df_veteran$time, type = "cumhaz")
+cox_snell <- cumhaz_out[[1]]$est
+
+#************* KM fit for Cox-Snell residuals
+cs_fit <- survfit(Surv(cox_snell, df_veteran$status) ~ 1)
+
+
+par(mfrow = c(2, 2))
+
+#****  KM vs GenGamma
+plot(
+  km_fit,
+  col = "black",
+  lwd = 2,
+  xlab = "Time (days)",
+  ylab = "Survival Probability",
+  main = "KM vs Generalized Gamma"
+)
+lines(time_seq, S_t, col = "red", lwd = 2)
+legend(
+  "topright",
+  legend = c("Kaplan-Meier", "Generalized Gamma"),
+  col = c("black", "red"),
+  lwd = 2,
+  bty = "n"
+)
+
+#********* Cox-Snell residual plot
+plot(
+  cs_fit,
+  fun = "cumhaz",
+  xlab = "Cox-Snell Residuals",
+  ylab = "Cumulative Hazard",
+  main = "Cox-Snell Plot",
+  lwd = 2
+)
+abline(0, 1, col = "red", lwd = 2)
+
+#****** Cumulative hazard comparison
+plot(
+  km_fit,
+  fun = "cumhaz",
+  col = "darkgreen",
+  lwd = 2,
+  xlab = "Time (days)",
+  ylab = "Cumulative Hazard",
+  main = "Cumulative Hazard"
+)
+lines(time_seq, -log(S_t), col = "red", lwd = 2)
+legend(
+  "topleft",
+  legend = c("KM", "Gen Gamma"),
+  col = c("darkgreen", "red"),
+  lwd = 2,
+  bty = "n"
+)
+
+#****  Histogram of Cox-Snell residuals
+hist(
+  cox_snell,
+  breaks = 30,
+  col = "gray",
+  main = "Histogram of Cox-Snell Residuals",
+  xlab = "Residuals"
+)
+
+par(mfrow = c(1, 1))
+```
 
 
 
