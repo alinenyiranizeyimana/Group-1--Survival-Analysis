@@ -136,3 +136,173 @@ baseline
 save_kable(baseline, "baseline_table.png", zoom = 4)
 ```
 
+
+
+
+
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+sum_tab <- data.frame(
+  "Sample Size" = nrow(veteran),
+  "Events" = sum(veteran$status == 1),
+  "Censored" = sum(veteran$status == 0),
+  "Mean Time" = round(mean(veteran$time, na.rm = TRUE), 2),
+  "Min Time" = min(veteran$time, na.rm = TRUE),
+  "Max Time" = max(veteran$time, na.rm = TRUE),
+  "Mean Age" = round(mean(veteran$age, na.rm = TRUE), 2),
+  "Mean Karno" = round(mean(veteran$karno, na.rm = TRUE), 2),
+  check.names = FALSE
+)
+
+sum_kbl <- kbl(
+  sum_tab,
+  format = "html",
+  align = "c",
+  caption = ""
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    font_size = 18,
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#1F4E79") %>%
+  row_spec(1:nrow(sum_tab), extra_css = "border-bottom: 1px solid #999;") %>%
+  column_spec(1, color = "black", width = "8em") %>%
+  column_spec(2, color = "black", width = "8em") %>%
+  column_spec(3, color = "black", width = "8em") %>%
+  column_spec(4, color = "black", width = "8em") %>%
+  column_spec(5, color = "black", width = "8em") %>%
+  column_spec(6, color = "black", width = "8em") %>%
+  column_spec(7, color = "black", width = "8em") %>%
+  column_spec(8, color = "black", width = "8em")
+
+sum_kbl
+
+save_kable(sum_kbl, "summary_table.png", zoom = 4)
+```
+
+
+
+
+
+### Minimum and Maximum 
+
+```{r}
+range_plot_data <- df_veteran %>%
+  summarise(
+    age_min = min(age, na.rm = TRUE),
+    age_max = max(age, na.rm = TRUE),
+    karno_min = min(karno, na.rm = TRUE),
+    karno_max = max(karno, na.rm = TRUE),
+    diagtime_min = min(diagtime, na.rm = TRUE),
+    diagtime_max = max(diagtime, na.rm = TRUE),
+    time_min = min(time, na.rm = TRUE),
+    time_max = max(time, na.rm = TRUE)
+  ) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Variable", "Statistic"),
+    names_sep = "_",
+    values_to = "Value"
+  )
+
+ggplot(range_plot_data, aes(x = Variable, y = Value, fill = Statistic)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(
+    aes(label = round(Value, 1)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.3,
+    size = 4
+  ) +
+  scale_fill_manual(values = c(
+  "min" = "darkgreen",
+  "max" = "#A52A2A"
+))+
+  labs(
+    title = "Minimum and Maximum Values of Key Variables",
+    x = "Variable",
+    y = "Value"
+  ) +
+  theme_pubr(base_size = 13)+
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.1,vjust = 0.1, ))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Survival times distribution
+
+
+
+
+```{r}
+#| warning: false
+#| message: false
+
+
+ggplot(df_veteran, aes(x = time)) +
+  geom_histogram(binwidth = 40, fill = "darkgreen", color = "white") +
+  labs(
+    title = "Distribution of Survival Times",
+    x = "Survival time (days)",
+    y = "Number of patients"
+  ) +
+  scale_x_continuous(limits = c(0, max(df_veteran$time)), expand = c(0, 0)) +
+  theme_pubr()+
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.2,vjust = 0.1, ))
+```
+
+
+
+
+### Swimmer plot to visualize the death and censored
+
+
+```{r}
+swimmer_df <- df_veteran %>%
+  mutate(
+    id = row_number(),
+    start = 0,
+    end = time,
+    event = ifelse(status == 1, 1, 0)
+  ) %>%
+  slice(1:20)
+
+swimmer_plot <- ggplot(swimmer_df, aes(y = factor(id))) +
+  geom_segment(
+    aes(x = start, xend = end, yend = factor(id)),
+    linewidth = 1.2,
+    colour = "steelblue"
+  ) +
+  geom_point(
+    aes(x = end, shape = factor(event), colour = factor(event)),
+    size = 3.5
+  ) +
+  scale_shape_manual(values = c(16, 17), labels = c("Censored", "Death")) +
+  scale_colour_manual(values = c("grey40", "firebrick"), labels = c("Censored", "Death")) +
+  labs(
+    x = "Time (days)",
+    y = "Patient ID",
+    shape = "Outcome",
+    colour = "Outcome",
+    title = "Sample of censored and death"
+  ) +
+   theme_pubr()+
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.2,vjust = 0.1, ))
+
+swimmer_plot
+```
+
+
