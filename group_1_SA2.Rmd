@@ -1174,7 +1174,188 @@ which(abs(dev_res) > 2)
 
 
 
+# Step 5. Model refinement and extended cox models
 
+
+
+
+
+```{r}
+
+#************ Initial multivariable Cox model
+
+multi_mod <- coxph(
+  Surv(time, status) ~ trt + celltype + karno + age + diagtime + prior,
+  data = df_veteran
+)
+
+#********** PH assumption check for the initial model
+multi_ph <- cox.zph(multi_mod)
+multi_ph
+
+#************ Refined Cox model
+
+refined_mod <- coxph(
+  Surv(time, status) ~ trt + age + diagtime + prior +
+    karno + tt(karno) + strata(celltype),
+  data = df_veteran,
+  tt = function(x, t, ...) x * log(t + 1)
+)
+
+summary(refined_mod)
+```
+
+
+
+## AIC for multi model and refined cox model
+
+
+
+
+```{r}
+
+multi_mod <- coxph(
+  Surv(time, status) ~ trt + celltype + karno + age + diagtime + prior,
+  data = df_veteran
+)
+
+summary(multi_mod)
+
+
+multi_ph <- cox.zph(multi_mod)
+print(multi_ph)
+
+
+#**********  Stratify by celltype only
+
+refined_celltype <- coxph(
+  Surv(time, status) ~ trt + karno + age + diagtime + prior + strata(celltype),
+  data = df_veteran
+)
+
+summary(refined_celltype)
+
+
+#********** Stratify by karno only
+
+refined_karno <- coxph(
+  Surv(time, status) ~ trt + celltype + age + diagtime + prior +
+    karno + tt(karno),
+  data = df_veteran,
+  tt = function(x, t, ...) x * log(t + 1)
+)
+
+summary(refined_karno)
+
+
+#*************** Stratify by celltype + time-varying karno
+
+refined_both <- coxph(
+  Surv(time, status) ~ trt + age + diagtime + prior +
+    karno + tt(karno) + strata(celltype),
+  data = df_veteran,
+  tt = function(x, t, ...) x * log(t + 1)
+)
+
+summary(refined_both)
+
+#****************** Compare AIC
+
+aic_tbl <- AIC(
+  multi_mod,
+  refined_celltype,
+  refined_karno,
+  refined_both
+) %>%
+  as.data.frame() %>%
+  mutate(
+    Model = c(
+      "Initial multivariable Cox model",
+      "Refined: celltype only",
+      "Refined: karno only",
+      "Refined: celltype + karno"
+    )
+  ) %>%
+  select(Model, AIC) %>%
+  arrange(AIC)
+
+print(aic_tbl)
+
+
+ggplot(aic_tbl, aes(x = reorder(Model, AIC), y = AIC, color = Model)) +
+  geom_segment(aes(xend = Model, y = 0, yend = AIC), linewidth = 1.2) +
+  geom_point(size = 4, shape = 1, stroke = 1.2) +
+  geom_text(aes(label = round(AIC, 2)), vjust = -0.8, size = 4.5, color = "black") +
+  labs(
+    title = "AIC comparison of Cox models",
+    x = "",
+    y = "AIC"
+  ) +
+  theme_classic() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 16),
+    axis.text.x = element_text(size = 11, angle = 20, hjust = 1),
+    axis.text.y = element_text(size = 11),
+    legend.position = "none"
+  )+ coord_cartesian(ylim = c(0, 1100))
+```
+
+Final refined cox model
+
+
+```{r}
+
+refined_results <- broom::tidy(
+  refined_both,
+  exponentiate = TRUE,
+  conf.int = TRUE
+) %>%
+  mutate(
+    term = recode(
+      term,
+      "trtTest" = "Treatment: Test vs Standard",
+      "age" = "Age",
+      "priorYes" = "Prior therapy: Yes vs No",
+      "karno" = "Karnofsky score",
+      "tt(karno)" = "Time-dependent effect of Karnofsky score",
+      "ns(diagtime, df = 3)1" = "Diagnosis time spline 1",
+      "ns(diagtime, df = 3)2" = "Diagnosis time spline 2",
+      "ns(diagtime, df = 3)3" = "Diagnosis time spline 3"
+    ),
+    `Hazard Ratio` = round(estimate, 3),
+    `95% CI` = paste0(round(conf.low, 3), " - ", round(conf.high, 3)),
+    `p-value` = signif(p.value, 3)
+  ) %>%
+  select(
+    Term = term,
+    `Hazard Ratio`,
+    `95% CI`,
+    `p-value`
+  )
+
+refined_tbl <- kbl(
+  refined_results,
+  format = "html",
+  align = "lccc",
+  caption = ""
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    font_size = 20,
+    bootstrap_options = c("striped", "hover", "condensed", "responsive")
+  ) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#1F4E79") %>%
+  row_spec(1:nrow(refined_results), extra_css = "border-bottom: 1px solid #999;") %>%
+  column_spec(1, width = "18em", color = "black") %>%
+  column_spec(2:4, width = "10em", color = "black")
+
+
+refined_tbl
+
+
+save_kable(refined_tbl, file = "refined_model_table.png", zoom = 4)
+
+```
 
 
 
